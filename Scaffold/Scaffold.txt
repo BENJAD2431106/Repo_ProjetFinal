@@ -1,0 +1,3 @@
+Scaffold 
+
+PM>  scaffold-dbcontext -provider Microsoft.EntityFrameworkCore.SqlServer -connection 'Data Source=dicjwin01.cegepjonquiere.ca;Initial Catalog=PROG3A25_Production_AllysonJad;MultipleActiveResultSets=true;User Id=prog3e05;Password=visage30' -outputdir "Models" -ContextDir "Data" -DataAnnotations

@@ -1,0 +1,73 @@
+﻿@using Microsoft.AspNetCore.Components.Forms
+@using OnyraProjet.Models
+
+<div class="p-3 border rounded shadow-sm">
+    <h4 class="mb-3">
+        Ajouter des données pour le
+        @SelectedDate.ToString("dd MMMM yyyy")
+    </h4>
+
+    <EditForm Model="NouveauCalendrier" OnValidSubmit="() => OnValidSubmit.InvokeAsync()">
+
+        <div class="form-group mb-2">
+            <label for="ressenti">Votre Ressenti :</label>
+            <InputNumber class="form-control" id="ressenti" @bind-Value=NouveauCalendrier.Ressenti></InputNumber>
+        </div>
+
+        <div class="form-group mb-2">
+            <label>Date du Coucher</label>
+            <InputDate class="form-control" @bind-Value=DateCoucher @onchange="((e) => OnDateCoucherChanged.InvokeAsync((DateOnly)e.Value!))"></InputDate>
+
+            <label class="mt-1">Heure du Coucher</label>
+            <input type="time" class="form-control"
+                   value="@(HeureCoucher.ToString("HH:mm"))"
+                   @onchange="((e) => OnHeureCoucherChanged.InvokeAsync(DateTime.Parse(e.Value!.ToString()!)))" />
+        </div>
+
+        <div class="form-group mb-2">
+            <label>Date du Réveil</label>
+            <InputDate class="form-control" @bind-Value="@DateLever" readonly></InputDate>
+
+            <label class="mt-1">Heure du Réveil</label>
+            <input type="time" class="form-control"
+                   value="@(HeureLever.ToString("HH:mm"))"
+                   @onchange="((e) => OnHeureLeverChanged.InvokeAsync(DateTime.Parse(e.Value!.ToString()!)))" />
+        </div>
+
+        <div class="form-group mb-2">
+            <label for="nbReveil">Nombre de réveils</label>
+            <InputNumber class="form-control" id="nbReveil" @bind-Value=NouveauCalendrier.NbreReveil></InputNumber>
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="commentaire">Commentaires :</label>
+            <InputTextArea class="form-control" id="commentaire" @bind-Value=NouveauCalendrier.Commentaire></InputTextArea>
+        </div>
+
+        <p class="text-danger text-center">@Message</p>
+        <button class="btn btn-success me-2">Enregistrer</button>
+        <button class="btn btn-secondary" @onclick="() => OnCancel.InvokeAsync()">Annuler</button>
+
+    </EditForm>
+</div>
+
+@code {
+    [Parameter] public DateTime SelectedDate { get; set; }
+    [Parameter] public OnyraProjet.Models.Calendrier NouveauCalendrier { get; set; } = new();
+    [Parameter] public string Message { get; set; }
+
+    // Les liaisons pour les propriétés complexes (DateOnly / DateTime)
+    [Parameter] public DateOnly DateCoucher { get; set; }
+    [Parameter] public DateOnly DateLever { get; set; }
+    [Parameter] public DateTime HeureCoucher { get; set; }
+    [Parameter] public DateTime HeureLever { get; set; }
+
+    // Événements (pour remonter l'action au parent)
+    [Parameter] public EventCallback OnValidSubmit { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    // Pour remonter la valeur de Date/Heure modifiée au parent
+    [Parameter] public EventCallback<DateOnly> OnDateCoucherChanged { get; set; }
+    [Parameter] public EventCallback<DateTime> OnHeureCoucherChanged { get; set; }
+    [Parameter] public EventCallback<DateTime> OnHeureLeverChanged { get; set; }
+}

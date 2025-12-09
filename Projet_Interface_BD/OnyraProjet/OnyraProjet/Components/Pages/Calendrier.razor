@@ -1,0 +1,404 @@
+﻿@page "/Calendrier"
+@using System.Globalization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Security.Claims
+@using Authentication
+@using OnyraProjet.Models
+@inject OnyraProjet.Services.CalendrierService calendrierService
+@inject OnyraProjet.Services.VisualisateurCalendrierService visCalService
+@inject OnyraProjet.Services.Medecin medecinService
+@inject AuthenticationStateProvider AuthService
+@rendermode InteractiveServer
+@inject NavigationManager nav
+
+<h3 class="mb-3 text-center">Calendrier</h3>
+
+<div class="row">
+    <div class="col-lg-6">
+        <CalendarComponent CurrentMonth="@currentMonth"
+                           Days="@days"
+                           DayNames="@dayNames"
+                           SelectedDate="@selectedDate"
+                           JoursRemplis="@joursRemplis"
+                           OnPrevMonth="PrevMonth"
+                           OnNextMonth="NextMonth"
+                           OnDaySelected="SelectDay" />
+    </div>
+
+    <div class="col-lg-6">
+        @if (selectedDate != DateTime.MinValue)
+        {
+            @if (joursRemplis.Contains(DateOnly.FromDateTime(selectedDate)))
+            {
+                <DayDataDisplay CalendrierJour="@calendrierJour"
+                                SelectedDate="@selectedDate"
+                                MedecinSelectionne="@medecinSelectionne"
+                                OnModify="ModifierNuit"
+                                OnDeselectDoctor="DeselectionnerMedecin"
+                                OnLoadDoctors="ChargerMedecins"
+                                AfficherFormulaireModification="@afficherFormulaireModification" />
+
+                @if (afficherFormulaireModification && calendrierJour is not null)
+                {
+                    <div class="card mt-3 shadow-sm">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Modifier la nuit du <strong>@selectedDate.ToShortDateString()</strong></h5>
+                        </div>
+
+                        <div class="card-body">
+
+                            <div class="mb-3">
+                                <label for="noteModifiee" class="form-label fw-bold">Note/Commentaire</label>
+                                <input id="noteModifiee" class="form-control" @bind="noteModifiee" placeholder="Ajouter un commentaire ou ressenti" />
+                            </div>
+
+                            <div class="row mb-3 gx-2">
+                                <label class="form-label fw-bold">Heure de coucher</label>
+                                <div class="col-6">
+                                    <label for="dateCoucherModifiee" class="form-label text-muted small mb-0">Date</label>
+                                    <input type="date" id="dateCoucherModifiee" class="form-control" @bind="dateCoucherModifiee"/>
+                                </div>
+                                <div class="col-6">
+                                    <label for="heureCoucherModifiee" class="form-label text-muted small mb-0">Heure</label>
+                                    <input type="time" id="heureCoucherModifiee" class="form-control" @bind="heureCoucherModifiee" />
+                                </div>
+                            </div>
+
+                            <div class="row mb-3 gx-2">
+                                <label class="form-label fw-bold">Heure de lever</label>
+                                <div class="col-6">
+                                    <label for="dateLeverModifiee" class="form-label text-muted small mb-0">Date</label>
+                                    <input type="date" id="dateLeverModifiee" class="form-control" @bind="dateLeverModifiee" readonly />
+                                </div>
+                                <div class="col-6">
+                                    <label for="heureLeverModifiee" class="form-label text-muted small mb-0">Heure</label>
+                                    <input type="time" id="heureLeverModifiee" class="form-control" @bind="heureLeverModifiee" />
+                                </div>
+                            </div>
+
+                            <hr />
+                            <p>@msgModif</p>
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-success mt-2 fw-bold" @onclick="EnregistrerModifications">
+                                    ✔️ Enregistrer modifications
+                                </button>
+                                <button class="btn btn-outline-secondary mt-1" @onclick="() => afficherFormulaireModification = false">
+                                    Annuler
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <DataAdditionForm SelectedDate="@selectedDate"
+                                  NouveauCalendrier="@nouveauCalendrier"
+                                  DateCoucher="@dateCoucher"
+                                  DateLever="@dateLever"
+                                  HeureCoucher="@heureCoucher"
+                                  HeureLever="@heureLever"
+                                  Message="@message"
+                                  OnValidSubmit="HandleError"
+                                  OnCancel="AnnulerFormulaire"
+                                  OnDateCoucherChanged="((val) => dateCoucher = val)"
+                                  OnHeureCoucherChanged="((val) => heureCoucher = val)"
+                                  OnHeureLeverChanged="((val) => heureLever = val)"/>
+            }
+
+            @if (afficherMedecins && joursRemplis.Contains(DateOnly.FromDateTime(selectedDate)))
+            {
+                <DoctorAppointmentSection ListeMedecins="@listeMedecins"
+                                          DateRdv="@dateRdv"
+                                          MessageMed="@messageMed"
+                                          OnDateRdvChanged="((val) => dateRdv = val)"
+                                          OnSelectDoctor="ChoisirMedecin" />
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationState { get; set; }
+    private Models.Calendrier? calendrierJour;
+    OnyraProjet.Models.Calendrier? nouveauCalendrier = new OnyraProjet.Models.Calendrier();
+    private DateOnly? dateRdv = null;
+    private int idUtilisateur;
+    private DateTime currentMonth = DateTime.Today;
+    private DateTime selectedDate = DateTime.MinValue;
+    private string message = "";
+    private string msgModif = "";
+    private string messageMed = "";
+    private List<DateOnly> joursRemplis = new();
+    // propriétés existantes
+    private DateOnly dateCoucher { get; set; }
+    private DateOnly dateLever { get; set; }
+    private DateTime heureCoucher { get; set; } // contient l'heure (date partie ignorée)
+    private DateTime heureLever { get; set; }
+    private bool afficherFormulaireModification = false;
+    // combinaisons correctes
+    private DateTime CoucherComplet => dateCoucher.ToDateTime(TimeOnly.FromDateTime(heureCoucher));
+    private DateTime LeverComplet => dateLever.ToDateTime(TimeOnly.FromDateTime(heureLever));
+
+    private string note = "";
+    private string[] dayNames = new[] { "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim" };
+    private List<DateTime> days = new();
+
+    private bool afficherMedecins = false;
+    private List<Utilisateur> listeMedecins = new();
+    private Utilisateur? medecinSelectionne = null;
+
+    string? noteModifiee;
+
+    TimeOnly heureCoucherModifiee;
+    TimeOnly heureLeverModifiee;
+    private DateOnly dateLeverModifiee = DateOnly.FromDateTime(DateTime.Now);
+    DateOnly dateCoucherModifiee =DateOnly.FromDateTime(DateTime.Now);
+    DateTime dateSelectionnee; // la date que l’utilisateur modifie
+
+    protected override async Task OnInitializedAsync()
+    {
+        GenerateCalendar();
+        afficherFormulaireModification = false;
+
+        var authState = await authenticationState;
+        var user = authState.User;
+
+        if (!user.Identity?.IsAuthenticated ?? true)
+        {
+            message = "Vous devez être connecté.";
+            return;
+        }
+
+        var idClaim =
+            user.FindFirst(ClaimTypes.NameIdentifier) ??
+            user.FindFirst(c => c.Type.Contains("nameidentifier")) ??
+            user.FindFirst("sub");
+
+        if (idClaim == null)
+        {
+            message = "Impossible de déterminer l'identifiant utilisateur.";
+            return;
+        }
+
+        if (!int.TryParse(idClaim.Value, out idUtilisateur))
+        {
+            message = "Identifiant utilisateur invalide.";
+            return;
+        }
+
+        joursRemplis = await calendrierService.SavoirSiRempli(idUtilisateur);
+
+        var (dateRdvEnregistree, medecinAttribue) =
+        await medecinService.ChargerDossierMedecin(idUtilisateur);
+
+        if (dateRdvEnregistree is not null)
+            dateRdv = dateRdvEnregistree;
+
+        if (medecinAttribue is not null)
+        {
+            medecinSelectionne = medecinAttribue;
+            // On peut ne pas afficher la liste des médecins s'il y en a déjà un
+            // afficherMedecins = true; 
+            // listeMedecins = new List<Utilisateur> { medecinSelectionne };
+        }
+    }
+
+
+    // --- Méthodes de gestion du calendrier (appelées par CalendarComponent) ---
+    private void GenerateCalendar()
+    {
+        days.Clear();
+        var firstDay = new DateTime(currentMonth.Year, currentMonth.Month, 1);
+        int offset = ((int)firstDay.DayOfWeek + 6) % 7;
+        var startDate = firstDay.AddDays(-offset);
+
+        for (int i = 0; i < 42; i++)
+        {
+            days.Add(startDate.AddDays(i));
+        }
+    }
+
+    private void PrevMonth()
+    {
+        currentMonth = currentMonth.AddMonths(-1);
+        GenerateCalendar();
+    }
+
+    private void NextMonth()
+    {
+        currentMonth = currentMonth.AddMonths(1);
+        GenerateCalendar();
+    }
+
+    private async Task SelectDay(DateTime date)
+    {
+        selectedDate = date;
+        afficherFormulaireModification = false; // Fermer la modification lors du changement de jour
+        afficherMedecins = false; // Cacher la liste des médecins lors du changement de jour
+
+        if (joursRemplis.Contains(DateOnly.FromDateTime(date)))
+        {
+            await ChargerDonnees(selectedDate);
+        }
+        else
+        {
+            // Prépare le formulaire d'ajout
+            dateLever = DateOnly.FromDateTime(selectedDate);
+            dateCoucher = DateOnly.FromDateTime(selectedDate.AddDays(-1)); // Hypothèse: coucher la veille
+            DateOnly dateDB = DateOnly.FromDateTime(selectedDate);
+            nouveauCalendrier = new Models.Calendrier { Dates = dateDB, NoUtilisateur = idUtilisateur };
+            heureCoucher = DateTime.Today.AddHours(22); // Heure par défaut
+            heureLever = DateTime.Today.AddHours(6);    // Heure par défaut
+        }
+    }
+
+    // --- Méthodes de gestion des données (services) ---
+    public async Task HandleError()
+    {
+        message = string.Empty;
+        if (!string.IsNullOrEmpty(nouveauCalendrier.Ressenti.ToString()) && (nouveauCalendrier.Ressenti > 10 || nouveauCalendrier.Ressenti < 1))
+        {
+            message = "Ressenti invalide (doit être entre 1 et 10).";
+            return;
+        }
+
+        var aujourdHui = DateOnly.FromDateTime(selectedDate);
+        var hier = aujourdHui.AddDays(-1);
+
+        if (dateCoucher != aujourdHui && dateCoucher != hier)
+        {
+            message = "La date de coucher doit être le jour du lever ou la veille.";
+            return;
+        }
+
+        await AjouterCalendrier();
+    }
+
+    public async Task AjouterCalendrier()
+    {
+        try
+        {
+            nouveauCalendrier.HeureCoucher = CoucherComplet;
+            nouveauCalendrier.HeureLever = LeverComplet;
+            await calendrierService.AjouterCalendrier(nouveauCalendrier);
+
+            // Mise à jour de l'état après l'ajout
+            joursRemplis = await calendrierService.SavoirSiRempli(idUtilisateur);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e.Message);
+        }
+
+        // Rediriger/Recharger la page pour rafraîchir le calendrier
+        nav.NavigateTo("/Calendrier", forceLoad: true);
+    }
+
+    private void AnnulerFormulaire()
+    {
+        selectedDate = DateTime.MinValue;
+        nouveauCalendrier = new Models.Calendrier();
+        message = "";
+        GenerateCalendar();
+    }
+
+    public async Task ChargerDonnees(DateTime date)
+    {
+        try
+        {
+            calendrierJour = await visCalService.VisualiserDate(date, idUtilisateur);
+
+            // Initialiser les champs de modification ici
+            if (calendrierJour != null)
+            {
+                noteModifiee = calendrierJour.Commentaire;
+                dateCoucherModifiee = DateOnly.FromDateTime(calendrierJour.HeureCoucher);
+                heureCoucherModifiee = TimeOnly.FromDateTime(calendrierJour.HeureCoucher);
+                dateLeverModifiee = DateOnly.FromDateTime(calendrierJour.HeureLever);
+                heureLeverModifiee = TimeOnly.FromDateTime(calendrierJour.HeureLever);
+            }
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
+    }
+
+    // --- Méthodes de gestion du médecin (appelées par DayDataDisplay / DoctorAppointmentSection) ---
+    private async Task ChargerMedecins()
+    {
+        afficherMedecins = true;
+        listeMedecins = await medecinService.GetMedecinsDisponibles();
+    }
+
+    private async Task ChoisirMedecin(int idMedecin)
+    {
+        messageMed = string.Empty;
+        if (dateRdv is null)
+        {
+            messageMed = "Veuillez sélectionner une date avant de choisir un médecin.";
+            return;
+        }
+        if (dateRdv <= DateOnly.FromDateTime(DateTime.Now))
+        {
+            messageMed = "Date dépassée.";
+            return;
+        }
+
+        await medecinService.EnregistrerMedecin(idUtilisateur, idMedecin, dateRdv.Value);
+        medecinSelectionne = listeMedecins.FirstOrDefault(m => m.NoUtilisateur == idMedecin);
+
+        if (medecinSelectionne == null)
+        {
+            // Récupérer le médecin depuis le service si non trouvé dans la liste locale (pour plus de robustesse)
+            (_, medecinSelectionne) = await medecinService.ChargerDossierMedecin(idUtilisateur);
+        }
+
+        messageMed = "Médecin enregistré avec rendez-vous.";
+        afficherMedecins = false; // Fermer la liste après sélection
+    }
+
+    private async Task DeselectionnerMedecin()
+    {
+        medecinSelectionne = null;
+        dateRdv = null;
+        await medecinService.RetirerMedecin(idUtilisateur);
+    }
+
+    private async Task ModifierNuit()
+    {
+        afficherFormulaireModification = true;
+        
+        // Les champs de modification sont déjà initialisés dans ChargerDonnees()
+        // C'est la façon la plus simple de réutiliser le formulaire interne.
+    }
+    
+    private async Task EnregistrerModifications()
+    {
+        msgModif = string.Empty;
+        if (dateCoucherModifiee <= dateLeverModifiee.AddDays(-2) || dateCoucherModifiee >= dateLeverModifiee)
+        {
+            msgModif = "⚠️ Faites attention à la date de coucher. Donnée erronée (Trop d'écart avec la date de lever).";
+            return; 
+        }
+        bool ok = await calendrierService.ModifierCalendrier(
+            idUtilisateur,
+            DateOnly.FromDateTime(selectedDate),
+            noteModifiee,
+            heureCoucherModifiee,
+            heureLeverModifiee,
+            dateCoucherModifiee,
+            dateLeverModifiee
+        );
+
+        if (ok)
+        {
+            await ChargerDonnees(selectedDate); // Recharger les données pour rafraîchir l'affichage
+        }
+        
+        afficherFormulaireModification = false;
+    }
+}

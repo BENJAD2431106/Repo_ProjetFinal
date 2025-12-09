@@ -1,0 +1,165 @@
+﻿@page "/donnees"
+@using OnyraProjet.Models
+@using OnyraProjet.Services
+@using OnyraProjet.Authentication
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Globalization
+
+@inject DonneeService donneeService
+@inject CustomAuthentificationStateProvider authProvider
+
+<PageTitle>Données</PageTitle>
+
+<h3 class="text-center mb-4">Données</h3>
+
+@if (donnee == null)
+{
+    <p>Chargement des données...</p>
+}
+else if (!donnee.Any())
+{
+    <p>Aucune donnée disponible.</p>
+}
+else
+{
+    <!-- Liste déroulante des dates -->
+    <div class="mb-4">
+        <label class="form-label"><strong>Choisir une date :</strong></label>
+        <select class="form-select w-25"
+                @onchange="FiltrerParDate">
+            @foreach (var date in datesDisponibles)
+            {
+                var value = date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                <option value="@value" selected="@(value == dateSelectionneeStr)">
+                    @date.ToString("dd/MM/yyyy")
+                </option>
+            }
+        </select>
+    </div>
+
+    @if (donneeFiltrees == null || !donneeFiltrees.Any())
+    {
+        <p>Aucune donnée pour cette date.</p>
+    }
+    else
+    {
+        <div class="table-responsive mb-4">
+            <table class="table table-bordered table-hover align-middle text-center" style="background-color: white;">
+                <thead class="table-light">
+                    <tr>
+                        <th>Date</th>
+                        <th>Heure</th>
+                        <th>Valeur Lumière (lux)</th>
+                        <th>Valeur Son (Hz)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var donneesCapteurs in donneeFiltrees)
+                    {
+                        <tr>
+                            <td>@donneesCapteurs.DateHeure.ToString("d")</td>
+                            <td>@donneesCapteurs.DateHeure.ToString("t")</td>
+                            <td>
+                                @if (donneesCapteurs.ValLumiere > 200)
+                                {
+                                    <span class="badge bg-danger">@donneesCapteurs.ValLumiere lux</span>
+                                }
+                                else
+                                {
+                                    <span>@donneesCapteurs.ValLumiere lux</span>
+                                }
+                            </td>
+                            <td>
+                                @if (donneesCapteurs.ValSon > 300)
+                                {
+                                    <span class="badge bg-danger">@donneesCapteurs.ValSon Hz</span>
+                                }
+                                else
+                                {
+                                    <span>@donneesCapteurs.ValSon Hz</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Messages centrés sous le tableau -->
+        <div class="d-flex justify-content-center mt-4">
+            <div class="w-50">
+                @if (donnee.Any())
+                {
+                    var lumiereMax = donnee.Max(d => d.ValLumiere);
+                    var sonMax = donnee.Max(d => d.ValSon);
+
+                    @if (lumiereMax > 200)
+                    {
+                        <div class="card border-danger shadow-sm mb-3">
+                            <div class="card-body text-center">
+                                <h5 class="card-title text-danger mb-1">⚠ Lumière très élevée !</h5>
+                                <p class="card-text">La valeur maximale atteinte est : <strong>@lumiereMax lux</strong></p>
+                            </div>
+                        </div>
+                    }
+
+                    @if (sonMax > 300)
+                    {
+                        <div class="card border-danger shadow-sm">
+                            <div class="card-body text-center">
+                                <h5 class="card-title text-danger mb-1">⚠ Son très élevé !</h5>
+                                <p class="card-text">La valeur maximale atteinte est : <strong>@sonMax Hz</strong></p>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private List<Donnee>? donnee;
+    private List<Donnee> donneeFiltrees = new();
+    private List<DateOnly> datesDisponibles = new();
+    private string? dateSelectionneeStr;
+    private int noUtilisateur;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await authProvider.GetAuthenticationStateAsync();
+        var userIdClaim = authState.User.FindFirst(c => c.Type == System.Security.Claims.ClaimTypes.NameIdentifier);
+        noUtilisateur = int.Parse(userIdClaim.Value);
+
+        // Récupère toutes les données de l'utilisateur
+        donnee = await donneeService.GetDonneesByUtilisateurAsync(noUtilisateur);
+
+        // Récupère les dates disponibles
+        datesDisponibles = await donneeService.GetDatesDisponiblesAsync(noUtilisateur);
+
+        if (datesDisponibles.Any())
+        {
+            // Sélection par défaut : la plus récente
+            var dateDefaut = datesDisponibles.First();
+            dateSelectionneeStr = dateDefaut.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+            // Récupère les données filtrées par date
+            donneeFiltrees = await donneeService.GetDonneesParDateAsync(noUtilisateur, dateDefaut);
+        }
+    }
+
+    private async Task FiltrerParDate(ChangeEventArgs e)
+    {
+        dateSelectionneeStr = e.Value?.ToString();
+
+        if (DateOnly.TryParseExact(
+                dateSelectionneeStr,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var dateSelectionnee))
+        {
+            donneeFiltrees = await donneeService.GetDonneesParDateAsync(noUtilisateur, dateSelectionnee);
+        }
+    }
+}

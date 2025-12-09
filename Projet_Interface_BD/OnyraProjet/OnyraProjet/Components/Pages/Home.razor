@@ -1,0 +1,70 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Nav
+
+<PageTitle>Accueil - Onyra</PageTitle>
+
+<div class="container-fluid min-vh-100 d-flex flex-column justify-content-between bg-gradient">
+
+    <!-- HERO + TEXTE -->
+    <div class="d-flex flex-column justify-content-center align-items-center py-5 w-100">
+        <AuthorizeView>
+            <Authorized>
+                <!-- HERO UTILISATEUR CONNECTÉ -->
+                <div class="card shadow-lg p-5 mb-4 text-center hero-card w-75">
+                    <h1 class="display-3 fw-bold mb-3">Bonjour, @context.User.Identity?.Name!</h1>
+                    <p class="lead mb-0">
+                        Ravi de vous revoir sur <strong>Onyra</strong>, votre espace bien-être dédié au sommeil.
+                    </p>
+                </div>
+
+                <!-- SECTION TEXTE INFORMATIF -->
+                <div class="card info-card shadow-lg text-center">
+                    <div class="decorative-line mb-3"></div>
+                    <h2 class="fw-bold mb-3" style="color:#4f46e5;">Le sommeil, votre allié</h2>
+
+                    <p class="fs-6 mb-3 text-dark mx-auto" style="text-align: justify; max-width: 650px;">
+                        <strong>Le sommeil est bien plus qu’un simple repos —</strong><br />
+                        c’est un retour à soi, un équilibre essentiel entre le corps et l’esprit.
+                    </p>
+
+                    <p class="fs-6 mb-3 text-dark mx-auto" style="text-align: justify; max-width: 650px;">
+                        À travers une approche simple et humaine, <strong>Onyra</strong> accompagne pas à pas
+                        vers des nuits plus calmes et réparatrices.
+                        Un espace dédié à l’écoute, à la sérénité et au mieux-dormir.
+                    </p>
+
+                    <p class="fs-6 fw-semibold mb-0 mx-auto" style="color:#333; text-align: justify; max-width: 650px;">
+                        Fermez les yeux… le voyage commence ici.
+                    </p>
+                </div>
+
+            </Authorized>
+
+            <NotAuthorized>
+                <!-- HERO INVITÉ -->
+                <div class="card shadow-lg p-5 mb-4 text-center hero-card w-75">
+                    <h1 class="display-3 fw-bold mb-3">Bonjour, invité !</h1>
+                    <p class="lead mb-4">
+                        Bienvenue sur <strong>Onyra</strong>, votre espace bien-être dédié au sommeil.
+                    </p>
+                    <div class="d-flex gap-3 justify-content-center flex-wrap">
+                        <button class="btn btn-primary btn-lg" @onclick='() => Nav.NavigateTo("/inscription")'>
+                            S'inscrire
+                        </button>
+                        <button class="btn btn-outline-primary btn-lg" @onclick='() => Nav.NavigateTo("/connexion")'>
+                            Se connecter
+                        </button>
+                    </div>
+                </div>
+            </NotAuthorized>
+        </AuthorizeView>
+    </div>
+
+    <!-- FOOTER FIXE BAS GAUCHE -->
+    <footer class="position-fixed bottom-0 start-0 m-3 d-flex align-items-center text-muted">
+        <i class="bi bi-envelope-fill me-2"></i>
+        <span>Onyra@hotmail.com</span>
+    </footer>
+
+</div>

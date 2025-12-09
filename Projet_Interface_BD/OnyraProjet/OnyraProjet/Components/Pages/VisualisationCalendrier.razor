@@ -1,0 +1,195 @@
+﻿@page "/VisualisationCalendrier"
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Globalization
+@using Authentication
+@using OnyraProjet.Models
+@using System.Security.Claims
+@using OnyraProjet.Services
+
+@inject OnyraProjet.Services.InscriptionService inscriptionService
+@inject OnyraProjet.Services.VisualisateurCalendrierService visCalService
+@inject OnyraProjet.Services.CalendrierService calendrierService
+@inject AuthenticationStateProvider AuthService
+@rendermode InteractiveServer
+
+<h3 class="mb-3 text-center">Calendrier</h3>
+
+<div class="row">
+    <div class="col-6">
+
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <button class="btn btn-outline-primary btn-sm" @onclick="PrevMonth">◀️</button>
+            <strong>@currentMonth.ToString("MMMM yyyy", CultureInfo.GetCultureInfo("fr-FR"))</strong>
+            <button class="btn btn-outline-primary btn-sm" @onclick="NextMonth">▶️</button>
+        </div>
+
+        <table class="table table-bordered text-center">
+            <thead class="table-light">
+                <tr>
+                    @foreach (var dayName in dayNames)
+                    {
+                        <th>@dayName</th>
+                    }
+                </tr>
+            </thead>
+
+            <tbody>
+                @for (int week = 0; week < 6; week++)
+                {
+                    <tr>
+                        @for (int day = 0; day < 7; day++)
+                        {
+                            var index = week * 7 + day;
+                            var date = days[index];
+                            var isCurrentMonth = date.Month == currentMonth.Month;
+                            var isSelected = date == selectedDate;
+
+                            string baseStyle = GetCellStyle(isCurrentMonth, isSelected);
+
+                            <td style="@($"{baseStyle}")"
+                                class="p-3"
+                                @onclick="() => SelectDay(date)">
+                                @date.Day
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="col-6">
+
+        @if (selectedDate != DateTime.MinValue)
+        {
+            <div class="p-3 border rounded shadow-sm">
+                <h4 class="mb-3">
+                    Visualisateur de Données pour Le
+                    @selectedDate.ToString("dd MMMM yyyy", CultureInfo.GetCultureInfo("fr-FR"))
+                </h4>
+
+            </div>
+        }
+        @if (calendrierJour is not null)
+        {
+            <div class="card">
+                <div class="card-body">
+                    <p><strong>Date :</strong> @calendrierJour.Dates.ToShortDateString()</p>
+                    <p><strong>Heure de coucher :</strong> @calendrierJour.HeureCoucher.ToShortTimeString()</p>
+                    <p><strong>Heure de lever :</strong> @calendrierJour.HeureLever.ToShortTimeString()</p>
+                    <p><strong>Ressenti :</strong> @calendrierJour.Ressenti</p>
+                </div>
+            </div>
+        }
+        else
+        {
+            <p>Aucune donnée pour cette date.</p>
+        }
+
+    </div>
+</div>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationState { get; set; }
+    private Models.Calendrier? calendrierJour;
+    private int idUtilisateur;
+    private DateTime currentMonth = DateTime.Today;
+    private DateTime selectedDate = DateTime.MinValue;
+    private string note = "";
+    private string[] dayNames = new[] { "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim" };
+    private List<DateTime> days = new();
+
+    protected override void OnInitialized()
+    {
+        GenerateCalendar();
+    }
+    protected override async Task<int> OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await authenticationState;
+            var idUtil = authState.User.FindFirst(c => c.Type.Contains("nameidentifier"));
+            return int.Parse(idUtil.Value);
+        }
+        catch (Exception e)
+        {
+            return 46;
+        }
+
+    }
+
+    private void GenerateCalendar()
+    {
+        days.Clear();
+        var firstDay = new DateTime(currentMonth.Year, currentMonth.Month, 1);
+        int offset = ((int)firstDay.DayOfWeek + 6) % 7;
+        var startDate = firstDay.AddDays(-offset);
+
+        for (int i = 0; i < 42; i++)
+        {
+            days.Add(startDate.AddDays(i));
+        }
+    }
+
+    private void PrevMonth()
+    {
+        currentMonth = currentMonth.AddMonths(-1);
+        GenerateCalendar();
+    }
+
+    private void NextMonth()
+    {
+        currentMonth = currentMonth.AddMonths(1);
+        GenerateCalendar();
+    }
+
+    private async Task SelectDay(DateTime date)
+    {
+        selectedDate = date;
+        await ChargerDonnees(selectedDate);
+    }
+
+    private string GetCellStyle(bool isCurrentMonth, bool isSelected)
+    {
+        string baseStyle = "padding:6px; text-align:center; border:1px solid #ccc; cursor:pointer;";
+        if (!isCurrentMonth)
+            baseStyle += "color:gray;";
+        if (isSelected)
+            baseStyle += "background-color:lightblue; font-weight:bold;";
+        return baseStyle;
+    }
+    public async Task VisualiserDate(DateTime date, int idUtilisateur)
+    {
+        Console.WriteLine($"Note pour {selectedDate.ToShortDateString()} : {note}");
+        note = "";
+        selectedDate = DateTime.MinValue;
+        try
+        {
+            var authState = await authenticationState;
+            var idUtil = authState.User.FindFirst(c => c.Type.Contains("nameidentifier"));
+            var noUtil = int.Parse(idUtil.Value);
+
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e.Message);
+        }
+    }
+    private async Task ChargerDonnees(DateTime date)
+    {
+
+        try
+        {
+            var idUtilisateur = await OnInitializedAsync();
+            calendrierJour = await visCalService.VisualiserDate(date, idUtilisateur);
+
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
+    }
+
+}

@@ -1,0 +1,155 @@
+﻿@page "/Inscription"
+@using Microsoft.AspNetCore.Components.Authorization
+@using OnyraProjet.Authentication
+@inject OnyraProjet.Services.InscriptionService inscriptionService
+@using OnyraProjet.Models
+@rendermode InteractiveServer
+@inject AuthenticationStateProvider AuthService
+@inject NavigationManager nav
+
+<PageTitle>Inscription</PageTitle>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-xl-6">
+            <h3 class="text-center mb-4 text-primary"><strong>📝 Inscription</strong></h3>
+
+            <EditForm Model="nouvelUtilisateur" formname="FormInscr" OnValidSubmit="HandleError" class="p-4 border rounded shadow-lg bg-white">
+
+                <div class="form-group mb-3">
+                    <label for="email" class="form-label fw-bold">Adresse Email</label>
+                    <InputText type="email" class="form-control" id="email" aria-describedby="emailHelp" placeholder="Entrez votre email" @bind-Value="nouvelUtilisateur.Courriel"></InputText>
+                    <small id="emailHelp" class="form-text text-muted">Nous ne partagerons jamais votre email.</small>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6 form-group">
+                        <label for="InputPrenom" class="form-label fw-bold">Prénom</label>
+                        <InputText type="text" class="form-control" id="InputPrenom" placeholder="Votre Prénom" @bind-Value="nouvelUtilisateur.PrenomUtilisateur"></InputText>
+                    </div>
+                    <div class="col-md-6 form-group">
+                        <label for="InputNom" class="form-label fw-bold">Nom de Famille</label>
+                        <InputText type="text" class="form-control" id="InputNom" placeholder="Votre Nom de Famille" @bind-Value="nouvelUtilisateur.NomUtilisateur"></InputText>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6 form-group">
+                        <label for="inputPassword6" class="form-label fw-bold">Mot de passe</label>
+                        <InputText type="password" id="inputPassword6" class="form-control" aria-describedby="passwordHelpInline" @bind-Value="nouvelUtilisateur.mdpInscription" placeholder="Entrez un mot de passe"></InputText>
+                    </div>
+                    <div class="col-md-6 form-group">
+                        <label for="inputPassword7" class="form-label fw-bold">Vérifier le mot de passe</label>
+                        <InputText type="password" id="inputPassword7" class="form-control" aria-describedby="passwordHelpInline" @bind-Value="mdpValid" placeholder="Répétez votre mot de passe"></InputText>
+                    </div>
+                    <div class="col-12 mt-1">
+                        <small id="passwordHelpInline" class="form-text text-muted">
+                            Choisissez un mot de passe sécurisé (minimum 8 caractères, etc.).
+                        </small>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-7 form-group">
+                        <label for="InputRamq" class="form-label fw-bold">Numéro d'Assurance Maladie (RAMQ)</label>
+                        <InputText type="text" class="form-control" id="InputRamq" placeholder="Entrez votre 'RamQ'" @bind-value="nouvelUtilisateur.RamQ"></InputText>
+                    </div>
+                    <div class="col-md-5 form-group">
+                        <label for="InputAge" class="form-label fw-bold">Âge</label>
+                        <InputNumber type="text" class="form-control" id="InputAge" placeholder="Entrez votre Âge" @bind-value="nouvelUtilisateur.Age"></InputNumber>
+                    </div>
+                </div>
+
+                <p class="text-danger text-center fw-bold">@message</p>
+
+                <button type="submit" class="btn btn-success btn-lg w-100 mt-3 shadow">S'inscrire</button>
+
+            </EditForm>
+        </div>
+    </div>
+</div>
+@code
+{
+    string mdpValid = "";
+    private string message = "";
+    Utilisateur? nouvelUtilisateur = new Utilisateur();
+    public async Task Inscrire()
+    {
+        var authentication = AuthService as CustomAuthentificationStateProvider;
+        try
+        {
+            await inscriptionService.AjouterUtilisateur_UP(nouvelUtilisateur, authentication);
+            nav.NavigateTo("/", forceLoad: true);
+        }
+        catch (Exception e)
+        {
+            throw (e);
+            message = "Inscription impossible.";
+
+        }
+
+    }
+    // Dans le fichier .razor ou .razor.cs de votre formulaire d'inscription
+
+    // Propriété où le fichier binaire sera stocké
+    // public Utilisateur NouvelUtilisateur { get; set; } // Votre modèle
+
+    private async Task HandleFileSelection(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file != null)
+        {
+            // Définir une limite de taille si nécessaire (ex: 5MB = 5 * 1024 * 1024)
+            var maxFileSize = 5 * 1024 * 1024;
+
+            if (file.Size > maxFileSize)
+            {
+                // Gérer l'erreur de taille
+                return;
+            }
+
+            // Lire le contenu du fichier dans un MemoryStream
+            using (var stream = file.OpenReadStream(maxFileSize))
+            {
+                var buffer = new byte[file.Size];
+                await stream.ReadAsync(buffer);
+
+                // Stocker le tableau de bytes dans votre modèle
+                nouvelUtilisateur.Photo = buffer;
+            }
+        }
+        else
+        {
+            nouvelUtilisateur.Photo = null;
+        }
+    }
+    public async Task HandleError()
+    {
+        message = string.Empty;
+
+        if (nouvelUtilisateur.mdpInscription != mdpValid)
+        {
+            message = "Mot de passes non correspondants.";
+            return;
+        }
+        if (!string.IsNullOrEmpty(nouvelUtilisateur.RamQ) && nouvelUtilisateur.RamQ.Length > 12)
+        {
+            message = "La RAMQ doit contenir un maximum de 12 caractères.";
+            return;
+        }
+        bool existe = await inscriptionService.UtilisateurExiste(nouvelUtilisateur.Courriel);
+        if (existe)
+        {
+            message = "Un utilisateur avec ce courriel existe déjà.";
+            return;
+        }
+        if(nouvelUtilisateur.Age<0)
+        {
+            message = "Comment ca "+nouvelUtilisateur.Age+" ans? ";
+            return;
+        }
+
+        await Inscrire();
+    }
+
+}

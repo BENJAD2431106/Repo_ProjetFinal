@@ -1,0 +1,80 @@
+﻿@page "/connexion"
+@using OnyraProjet.Authentication
+@using OnyraProjet.Services
+@using OnyraProjet.Models
+@inject ConnexionService connexionservice
+@inject NavigationManager NavigationManager
+@inject CustomAuthentificationStateProvider authProvider
+@inject IJSRuntime JS
+
+<PageTitle>Connexion</PageTitle>
+<div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="card shadow p-4" style="width: 380px;">
+
+        <EditForm Model="connexionModel" FormName="connexion">
+
+            <h3 class="text-center mb-4"><strong>Connexion</strong></h3>
+
+            <div class="mb-3">
+                <label class="form-label">Adresse courriel</label>
+                <input type="email" class="form-control" @bind="courriel" placeholder="Onyra@gmail.com" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Mot de passe</label>
+                <input type="password" class="form-control" @bind="motDePasse" placeholder="Mot de passe" />
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 mb-3" @onclick="SeConnecter">
+                Se connecter
+            </button>
+
+            <div class="text-center">
+                <a href="Inscription">Êtes-vous membre ?</a>
+            </div>
+
+        </EditForm>
+
+    </div>
+</div>
+
+@code {
+
+    private ConnexionModel connexionModel = new ConnexionModel();
+
+    private string courriel = "";
+    private string motDePasse = "";
+    private string message = "";
+
+    private bool ClearSession = false;
+
+    protected override async Task OnAfterRenderAsync(bool premierRendu)
+    {
+        if (premierRendu && !ClearSession)
+        {
+            ClearSession = true;
+
+            await authProvider.UpDateAuthenticationState(null);
+
+            StateHasChanged();
+        }
+    }
+
+    private async Task SeConnecter()
+    {
+        var session = await connexionservice.ConnexionEtRecupererSession(courriel, motDePasse);
+
+        if (session != null)
+        {
+            await authProvider.UpDateAuthenticationState(session);
+            StateHasChanged(); 
+            NavigationManager.NavigateTo("/", true);
+
+        }
+        else
+        {
+            message = "Courriel ou mot de passe incorrect.";
+            await JS.InvokeVoidAsync("alert", message);
+        }
+    }
+}

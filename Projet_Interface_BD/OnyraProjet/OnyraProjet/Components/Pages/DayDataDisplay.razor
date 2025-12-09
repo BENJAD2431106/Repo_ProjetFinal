@@ -1,0 +1,102 @@
+﻿@using System.Globalization
+
+<div class="p-3 border rounded shadow-sm bg-light mb-3">
+    <h4 class="mb-0 text-primary">
+        Visualisateur de Données pour le
+        <strong>@SelectedDate.ToString("dd MMMM yyyy", CultureInfo.GetCultureInfo("fr-FR"))</strong>
+    </h4>
+</div>
+
+@if (CalendrierJour is not null)
+{
+    {
+        dureeSommeil = CalendrierJour.HeureLever - CalendrierJour.HeureCoucher;
+        dureeFormat = $"{(int)dureeSommeil.TotalHours}h {dureeSommeil.Minutes}min";
+    }
+
+    <div class="card mt-3 shadow-sm">
+        <div class="card-body p-4">
+
+            <div class="d-flex flex-wrap justify-content-between mb-3">
+                
+                <div class="col-md-6 col-12 mb-3 mb-md-0">
+                    <p class="mb-1"><strong>Date :</strong> <span class="text-muted">@CalendrierJour.Dates.ToShortDateString()</span></p>
+                    <p class="mb-1"><strong>Heure de coucher :</strong> <span class="text-muted">@CalendrierJour.HeureCoucher.ToShortTimeString()</span></p>
+                    <p class="mb-1"><strong>Heure de lever :</strong> <span class="text-muted">@CalendrierJour.HeureLever.ToShortTimeString()</span></p>
+                </div>
+
+                <div class="col-md-6 col-12">
+                    <p class="mb-1"><strong>Ressenti :</strong> <span class="text-info fw-bold">@CalendrierJour.Ressenti</span></p>
+                    <p class="mb-1"><strong>Commentaire : </strong> <span class="text-muted">@(string.IsNullOrWhiteSpace(CalendrierJour.Commentaire) ? "Aucun" : CalendrierJour.Commentaire)</span></p>
+                    <p class="mb-1"><strong>Sommeil Total : </strong> <span class="text-success fw-bold">@dureeFormat</span></p>
+                </div>
+            </div>
+            
+            <hr />
+
+            @if (MedecinSelectionne is not null)
+            {
+                <div class="p-3 border rounded mb-3 bg-light shadow-sm">
+                    <h5 class="mb-2 text-dark">Médecin enregistré</h5>
+                    <div class="d-flex align-items-center">
+                        
+                        <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px; font-weight: bold; font-size: 1.2rem;">
+                            @((MedecinSelectionne.PrenomUtilisateur ?? "").FirstOrDefault().ToString().ToUpper())@((MedecinSelectionne.NomUtilisateur ?? "").FirstOrDefault().ToString().ToUpper())
+                        </div>
+                        
+                        <div>
+                            <div><strong>Dr. @MedecinSelectionne.PrenomUtilisateur @MedecinSelectionne.NomUtilisateur</strong></div>
+                            <small class="text-muted">@MedecinSelectionne.Courriel</small>
+                        </div>
+                        
+                        <div class="ms-auto">
+                            <button class="btn btn-outline-secondary btn-sm" @onclick="() => OnDeselectDoctor.InvokeAsync()">
+                                Retirer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (!AfficherFormulaireModification)
+            {
+                <button class="btn btn-warning w-100 mt-3" @onclick="() => OnModify.InvokeAsync()">
+                    ✏️ Modifier mes données pour cette nuit
+                </button>
+            }
+
+
+            @if (dureeSommeil.TotalHours <= 5 && MedecinSelectionne is null)
+            {
+                <div class="alert alert-danger mt-3" role="alert">
+                    <h5 class="alert-heading">⚠️ Durée de sommeil insatisfaisante.</h5>
+                    <p class="mb-2"><strong>Onyra vous conseille fortement de prendre rendez-vous avec un médecin.</strong></p>
+                    <hr class="my-2" />
+                    <button class="btn btn-danger" @onclick="() => OnLoadDoctors.InvokeAsync()">
+                        Prendre rendez-vous maintenant
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <div class="p-3 bg-light rounded text-center">
+        <p class="mb-0">Chargement des données...</p>
+    </div>
+}
+
+@code {
+    [Parameter] public DateTime SelectedDate { get; set; }
+    [Parameter] public OnyraProjet.Models.Calendrier? CalendrierJour { get; set; }
+    [Parameter] public OnyraProjet.Models.Utilisateur? MedecinSelectionne { get; set; }
+    [Parameter] public bool AfficherFormulaireModification { get; set; }
+
+    // Événements pour remonter les actions
+    [Parameter] public EventCallback OnModify { get; set; }
+    [Parameter] public EventCallback OnDeselectDoctor { get; set; }
+    [Parameter] public EventCallback OnLoadDoctors { get; set; }
+    TimeSpan dureeSommeil;
+    string dureeFormat;
+}

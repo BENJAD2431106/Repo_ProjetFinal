@@ -1,0 +1,55 @@
+﻿@using OnyraProjet.Models
+
+<div class="card mt-3">
+    <div class="card-body">
+        <h5>Médecins disponibles</h5>
+
+        <div class="mt-3">
+            <label>Date du rendez-vous :</label>
+            <input type="date" value="@(DateRdv?.ToString("yyyy-MM-dd"))" @onchange="HandleDateRdvChange" class="form-control" />
+        </div>
+
+        @if (ListeMedecins.Count == 0)
+        {
+            <p>Aucun médecin disponible.</p>
+        }
+        else
+        {
+            <ul class="list-group mt-3">
+                @foreach (var med in ListeMedecins)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>@med.NomUtilisateur @med.PrenomUtilisateur </strong><br />
+                            <small> Disponible.</small>
+                        </div>
+
+                        <button class="btn btn-primary btn-sm" @onclick="() => OnSelectDoctor.InvokeAsync(med.NoUtilisateur)">
+                            Choisir
+                        </button>
+                    </li>
+                }
+            </ul>
+        }
+        <p class="text-danger text-center mt-3">@MessageMed</p>
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<Utilisateur> ListeMedecins { get; set; } = new();
+    [Parameter] public DateOnly? DateRdv { get; set; }
+    [Parameter] public string MessageMed { get; set; } = "";
+
+    [Parameter] public EventCallback<DateOnly?> OnDateRdvChanged { get; set; }
+    [Parameter] public EventCallback<int> OnSelectDoctor { get; set; }
+
+    private async Task HandleDateRdvChange(ChangeEventArgs e)
+    {
+        DateOnly? newDateRdv = null;
+        if (e.Value is string dateString && DateOnly.TryParse(dateString, out var parsedDate))
+        {
+            newDateRdv = parsedDate;
+        }
+        await OnDateRdvChanged.InvokeAsync(newDateRdv);
+    }
+}

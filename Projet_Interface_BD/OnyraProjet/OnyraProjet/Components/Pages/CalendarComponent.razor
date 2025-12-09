@@ -1,0 +1,88 @@
+﻿@using System.Globalization
+
+<div class="card p-3 mb-4 mx-auto" style="max-width: 400px;">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <button class="btn btn-outline-primary btn-sm" @onclick="() => OnPrevMonth.InvokeAsync()">◀️</button>
+
+        <h4 class="text-center text-primary mb-0">
+            <strong>@CurrentMonth.ToString("MMMM yyyy", CultureInfo.GetCultureInfo("fr-FR"))</strong>
+        </h4>
+
+        <button class="btn btn-outline-primary btn-sm" @onclick="() => OnNextMonth.InvokeAsync()">▶️</button>
+    </div>
+
+    @if (Days != null && Days.Any())
+    {
+        <table class="table table-sm table-hover text-center">
+            <thead class="table-primary text-white">
+                <tr>
+                    @foreach (var dayName in DayNames)
+                    {
+                        <th>@dayName.ToUpper().Substring(0, 1)</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @for (int week = 0; week < 6; week++)
+                {
+                    <tr>
+                        @for (int day = 0; day < 7; day++)
+                        {
+                            var index = week * 7 + day;
+                            var date = Days[index];
+                            var isCurrentMonth = date.Month == CurrentMonth.Month;
+                            var isSelected = date == SelectedDate;
+                            var isFilled = JoursRemplis.Contains(DateOnly.FromDateTime(date));
+
+                            string cellClass = GetCellClass(isCurrentMonth, isSelected, isFilled);
+
+                            <td class="@cellClass" @onclick="() => OnDaySelected.InvokeAsync(date)">
+                                @date.Day
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    [Parameter] public DateTime CurrentMonth { get; set; }
+    [Parameter] public List<DateTime> Days { get; set; } = new();
+    [Parameter] public string[] DayNames { get; set; } = Array.Empty<string>();
+    [Parameter] public DateTime SelectedDate { get; set; }
+    [Parameter] public List<DateOnly> JoursRemplis { get; set; } = new();
+
+    [Parameter] public EventCallback OnPrevMonth { get; set; }
+    [Parameter] public EventCallback OnNextMonth { get; set; }
+    [Parameter] public EventCallback<DateTime> OnDaySelected { get; set; }
+
+    private string GetCellClass(bool isCurrentMonth, bool isSelected, bool isFilled)
+    {
+        string baseClasses = "p-2 cursor-pointer";
+
+        // Jours en dehors du mois actuel
+        if (!isCurrentMonth)
+            baseClasses += " text-muted";
+
+        // Jours remplis (occupés/validés)
+        if (isFilled)
+            baseClasses += " bg-success text-white fw-bold"; // Utilise bg-success (comme le bouton d'inscription)
+
+        // Jour sélectionné
+        if (isSelected)
+        {
+            // Si sélectionné, utilise bg-primary, ce qui correspond à la couleur des liens/boutons
+            if (isFilled)
+                // Surcharge : Jour rempli ET sélectionné
+                baseClasses = baseClasses.Replace("bg-success", "bg-warning text-dark");
+            else
+                // Surcharge : Jour non rempli ET sélectionné
+                baseClasses += " bg-primary text-white fw-bold";
+        }
+
+        return baseClasses;
+    }
+}

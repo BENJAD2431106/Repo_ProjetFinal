@@ -1,0 +1,142 @@
+﻿@page "/mot-de-passe-oublie"
+
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using OnyraProjet.Models
+@using OnyraProjet.Services
+@using System.Security.Claims
+@using OnyraProjet.Authentication
+
+@inject MotDePasseService MotDePasseService
+@inject AuthenticationStateProvider AuthService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+<PageTitle>Changer le mot de passe</PageTitle>
+
+@if (Chargement)
+{
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+        <div>Chargement…</div>
+    </div>
+}
+else if (messageErreur != null)
+{
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+        <div class="alert alert-danger">@messageErreur</div>
+    </div>
+}
+else
+{
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+        <div class="card shadow p-4" style="width: 380px;">
+
+            <EditForm Model="model" OnValidSubmit="HandleSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <h3 class="text-center mb-4"><strong>Changer le mot de passe</strong></h3>
+
+                <div class="mb-3">
+                    <label class="form-label">Mot de passe actuel</label>
+                    <InputText class="form-control" type="password"
+                               @bind-Value="model.MotDePasseActuel" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Nouveau mot de passe</label>
+                    <InputText class="form-control" type="password"
+                               @bind-Value="model.NouveauMotDePasse" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Confirmation</label>
+                    <InputText class="form-control" type="password"
+                               @bind-Value="model.ConfirmationMotDePasse" />
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 mb-3" disabled="@envoie">
+                    @if (envoie)
+                    {
+                        <span>En cours…</span>
+                    }
+                    else
+                    {
+                        <span>Enregistrer</span>
+                    }
+                </button>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    private ChangerMotDePasseModel model = new();
+    private int userId;
+    private bool Chargement = true;
+    private bool envoie = false;
+    private string? messageErreur;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthService.GetAuthenticationStateAsync();
+        var user = auth.User;
+
+        var idClaim = user.FindFirst(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+        if (idClaim == null || !int.TryParse(idClaim, out userId))
+        {
+            messageErreur = "Impossible d'identifier l'utilisateur.";
+        }
+
+        Chargement = false;
+    }
+
+    private async Task HandleSubmit() //gère la soumission d’un formulaire
+    {
+        //Vérifier les deux nouveaux mots de passe
+        if (model.NouveauMotDePasse != model.ConfirmationMotDePasse)
+        {
+            await JS.InvokeVoidAsync("alert", "Les mots de passe ne correspondent pas.");
+            return;
+        }
+
+        envoie = true;
+
+        try
+        {   
+            //vérifier anciens mot de passe
+            var motDePasseCorrect = await MotDePasseService.VerifierMotDePasseAsync(userId, model.MotDePasseActuel);
+
+            if (!motDePasseCorrect)
+            {
+                await JS.InvokeVoidAsync("alert", "Mot de passe actuel incorrect.");
+                return;
+            }
+
+            //modifier mot de passe
+
+            var modificationCorrecte = await MotDePasseService.ModifierMotDePasseAsync(userId, model.NouveauMotDePasse);
+
+            if (modificationCorrecte)
+            {
+                await JS.InvokeVoidAsync("alert", "Mot de passe modifié !");
+
+                // Mettre à jour l'état d'authentification si nécessaire
+                if (AuthService is CustomAuthentificationStateProvider customAuth)
+                {
+                    await customAuth.UpDateAuthenticationState(null);
+                }
+
+                NavigationManager.NavigateTo("/connexion", true);
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("alert", "Erreur lors de la modification du mot de passe.");
+            }
+        }
+        finally // Si une exception survient, elle remontera et Blazor affichera une erreur par défaut
+        {
+            envoie = false;
+        }
+    }
+}
