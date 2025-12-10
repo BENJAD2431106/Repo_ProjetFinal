@@ -79,17 +79,17 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        var auth = await AuthService.GetAuthenticationStateAsync();
-        var user = auth.User;
+        var authState = await AuthService.GetAuthenticationStateAsync();
+        var userIdClaim = authState.User.FindFirst(c => c.Type == ClaimTypes.NameIdentifier);
 
-        var idClaim = user.FindFirst(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
-        if (idClaim == null || !int.TryParse(idClaim, out userId))
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out userId))
         {
             messageErreur = "Impossible d'identifier l'utilisateur.";
         }
 
         Chargement = false;
     }
+
 
     private async Task HandleSubmit() //gère la soumission d’un formulaire
     {
@@ -113,19 +113,13 @@ else
                 return;
             }
 
-            //modifier mot de passe
-
-            var modificationCorrecte = await MotDePasseService.ModifierMotDePasseAsync(userId, model.NouveauMotDePasse);
+            var modificationCorrecte = await MotDePasseService.ModifierMotDePasseAsync(userId, model.MotDePasseActuel, model.NouveauMotDePasse);
 
             if (modificationCorrecte)
             {
                 await JS.InvokeVoidAsync("alert", "Mot de passe modifié !");
-
-                // Mettre à jour l'état d'authentification si nécessaire
                 if (AuthService is CustomAuthentificationStateProvider customAuth)
-                {
                     await customAuth.UpDateAuthenticationState(null);
-                }
 
                 NavigationManager.NavigateTo("/connexion", true);
             }
@@ -133,6 +127,7 @@ else
             {
                 await JS.InvokeVoidAsync("alert", "Erreur lors de la modification du mot de passe.");
             }
+
         }
         finally // Si une exception survient, elle remontera et Blazor affichera une erreur par défaut
         {
