@@ -83,7 +83,7 @@
         }
         catch (Exception e)
         {
-            throw (e);
+            Console.WriteLine(e.Message);
             message = "Inscription impossible.";
 
         }
@@ -137,15 +137,19 @@
             message = "La RAMQ doit contenir un maximum de 12 caractères.";
             return;
         }
+        if (nouvelUtilisateur.RamQ is null)
+        {
+            message = "RamQ vide";
+        }
         bool existe = await inscriptionService.UtilisateurExiste(nouvelUtilisateur.Courriel);
         if (existe)
         {
             message = "Un utilisateur avec ce courriel existe déjà.";
             return;
         }
-        if(nouvelUtilisateur.Age<0)
+        if (nouvelUtilisateur.Age < 0)
         {
-            message = "Comment ca "+nouvelUtilisateur.Age+" ans? ";
+            message = "Comment ca " + nouvelUtilisateur.Age + " ans? ";
             return;
         }
 
